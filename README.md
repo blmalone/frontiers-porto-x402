@@ -2,6 +2,24 @@
 
 A hackathon project demonstrating how Porto wallets can work with the [x402 payment standard](https://www.x402.org/) without requiring Coinbase's facilitator. This project showcases a key discovery: **Porto already supports x402 out of the box** through its ERC-1271 implementation.
 
+## What is x402?
+
+**x402** is an emerging web standard that enables **HTTP-based cryptocurrency payments** directly in web browsers. It allows users to pay for digital content using cryptocurrency without leaving the website.
+
+### How x402 Works
+
+1. **Payment Request**: Server responds with `402 Payment Required` containing payment details
+2. **Wallet Integration**: User's cryptocurrency wallet processes the payment request
+3. **Payment Verification**: Server verifies the payment on-chain and grants access
+4. **Content Delivery**: User receives the paid content seamlessly
+
+### The Current x402 Landscape
+
+Most x402 implementations rely on **Coinbase's centralized facilitator** to verify and process payments. This creates a single point of failure and goes against the decentralized ethos of cryptocurrency. The facilitator acts as an intermediary that:
+- Handles payment processing
+- Manages transaction signing
+- Provides payment verification services
+
 ## The Discovery
 
 **Problem**: The [x402 standard](https://www.x402.org/) requires using Coinbase's facilitator for payment processing, creating a centralized dependency.
@@ -12,11 +30,32 @@ A hackathon project demonstrating how Porto wallets can work with the [x402 paym
 
 ## Why This Matters
 
-- **Porto Discovery**: Reveals that Porto already has the capability to work with x402 out of the box
-- **No Contract Changes**: Leverages existing ERC-1271 implementation in Porto
 - **Decentralized x402**: Enables x402 payments without Coinbase's centralized facilitator
-- **Hackathon Impact**: Shows how existing tools can be combined in innovative ways
-- **Real-world Application**: Provides a template for integrating Porto with other payment standards
+- **Porto Discovery**: Reveals Porto already supports x402 through its ERC-1271 implementation
+- **No Contract Changes**: Leverages existing Porto infrastructure
+- **Ecosystem Impact**: Proves x402 can work without centralized intermediaries
+- **User Sovereignty**: Users maintain full control over payments without third-party fees
+
+## Porto's x402 Involvement
+
+Porto can participate in x402 payments in two ways:
+
+### Porto User + Any Merchant
+- Porto users can pay on any x402 site (including Coinbase-facilitated ones)
+- No merchant changes required
+
+### Porto User + Porto Merchant
+- Fully decentralized - no facilitator needed
+- Lower fees, better UX, more privacy
+
+### Why Porto Should Publicize This
+
+1. **User Feature**: x402 compatibility attracts new users
+2. **Merchant Network**: Porto can build its own x402 merchant ecosystem
+3. **Competitive Edge**: First-mover in facilitator-free x402 payments
+4. **Revenue**: Porto earns from merchant services instead of Coinbase
+
+**Strategy**: Position Porto as the "decentralized x402 solution" - both user wallets and merchant tools.
 
 ## Payment Flow & How It Works
 
