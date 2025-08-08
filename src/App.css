@@ -1439,6 +1439,21 @@ hr {
   gap: 0.5rem;
 }
 
+.tx-link {
+  color: #155724;
+  text-decoration: underline;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.tx-link:hover {
+  color: #0d4419;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
 /* Mobile responsive fortune box */
 @media (max-width: 768px) {
   .fortune-content {

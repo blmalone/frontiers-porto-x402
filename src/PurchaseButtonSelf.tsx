@@ -8,6 +8,7 @@ interface FortuneData {
   fortune: string;
   category: string;
   luckyNumber: string;
+  txHash?: string;
 }
 
 /**
@@ -178,7 +179,21 @@ export const PurchaseButtonSelf = () => {
                 <div className="unlock-overlay">
                   <div className="unlock-message">
                     <span className="unlock-emoji">✅</span>
-                    <span className="unlock-text">Unlocked with ${successData?.price}</span>
+                    <span className="unlock-text">
+                      Unlocked with{' '}
+                      {successData?.txHash ? (
+                        <a 
+                          href={`https://sepolia.basescan.org/tx/${successData.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="tx-link"
+                        >
+                          ${successData.price}
+                        </a>
+                      ) : (
+                        `$${successData?.price}`
+                      )}
+                    </span>
                   </div>
                 </div>
               </>

@@ -14,6 +14,7 @@ interface FortuneData {
   category: string;
   luckyNumber: number;
   price: number;
+  txHash?: string;
 }
 
 interface PaymentRequirements {
@@ -71,7 +72,7 @@ app.use('/*', cors({
 /**
  * Generates random fortune data
  */
-const getFortune = async (c: Context<{ Bindings: Env }>, price: number): Promise<Response> => {
+const getFortune = async (c: Context<{ Bindings: Env }>, price: number, txHash?: string): Promise<Response> => {
   const fortunes = [
     "A great adventure awaits you in the digital realm.",
     "Your blockchain investments will flourish like a digital garden.",
@@ -101,6 +102,7 @@ const getFortune = async (c: Context<{ Bindings: Env }>, price: number): Promise
     category: randomCategory,
     luckyNumber: randomLuckyNumber,
     price: price,
+    txHash: txHash,
   };
 
   return c.json(fortuneData);
@@ -230,8 +232,13 @@ app.get('/api/self/fortune', async (c) => {
       return c.json({ error: 'Payment failed' }, 500);
     }
 
-    // Payment successful, return fortune data
-    return getFortune(c, 0.001);
+    // Extract transaction hash from the first receipt
+    const txHash = status.receipts?.[0]?.transactionHash;
+
+    // Payment successful, return fortune data with actual paid amount
+    // Convert from wei (smallest unit) to USDC (6 decimals)
+    const actualPaidAmount = Number(authorization.value) / 1000000; // USDC has 6 decimals
+    return getFortune(c, actualPaidAmount, txHash);
   } catch (error: any) {
     console.error('Payment execution failed:', error);
     return c.json({ error: 'Payment execution failed' }, 500);
