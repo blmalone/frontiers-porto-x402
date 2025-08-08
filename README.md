@@ -36,7 +36,7 @@ The application implements a 7-step payment flow that bypasses the facilitator:
 
 ## Next Steps
 
-1. Request a review on Porto dialog PR:
+1. Request a review on Porto dialog PR: https://github.com/ithacaxyz/porto/pull/663 
 2. Create a PR to add x402 details to Porto SDK website: https://porto.sh/sdk
 
 ## Quick Start
