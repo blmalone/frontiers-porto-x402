@@ -179,7 +179,7 @@ Client sends payment authorization in base64-encoded header, bypassing Coinbase'
 
 ## Environment Setup
 
-### Server (.env)
+### Server (.dev.vars)
 ```bash
 MERCHANT_ADDRESS=0x50F1d3b9F5811F333e7Ef77D14B470cEAA08e905
 MERCHANT_PRIVATE_KEY=0x...
