@@ -1,33 +1,26 @@
 import { useState } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
-import { hashTypedData } from 'viem'
-import { readContract } from 'viem/actions';
-import { PORTO_ABI } from './abi';
-import { SequenceDiagram } from './SequenceDiagram';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { SERVER_URL } from './constants';
-import { Json } from 'ox'
+import { useTransferAuthorization } from './eip3009';
 
-interface WeatherData {
+interface FortuneData {
   price: string;
-  weather: string;
-  temperature: string;
-  futureDate: string;
-}
-
-interface PaymentRequest {
-  prepareCalls: string;
+  fortune: string;
+  category: string;
+  luckyNumber: string;
 }
 
 /**
- * A component that handles premium weather data purchases through signed transactions
+ * A simple component that fetches fortune data
  */
 export const PurchaseButtonSelf = () => {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const { signTransfer, isPending: isSigningPending } = useTransferAuthorization();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [successData, setSuccessData] = useState<WeatherData | null>(null);
-  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
+  const [successData, setSuccessData] = useState<FortuneData | null>(null);
 
   const handlePurchase = async () => {
     setIsProcessing(true);
@@ -35,84 +28,114 @@ export const PurchaseButtonSelf = () => {
     setSuccessData(null);
 
     try {
-      // Initial request for weather data
-      const initialResponse = await fetch(`${SERVER_URL}/api/self/weather`, {
-        headers: {
-          'X-USER-ADDRESS': address as `0x${string}`
+      // Check if user's address has code deployed
+      if (address && publicClient && walletClient) {
+        const bytecode = await publicClient.getBytecode({ address });
+        if (bytecode && bytecode !== '0x') {
+          console.log(`${address} is deployed`);
+        } else {
+          console.log(`${address} isn't deployed yet`);
+          
+          // Force deploy the Porto account using empty sendCalls
+          console.log('Deploying Porto account...');
+          try {
+            // Use wallet_sendCalls with empty calls to trigger counterfactual deployment
+            const deployResult = await (walletClient as any).request({
+              method: 'wallet_sendCalls',
+              params: [{
+                calls: [], // Empty calls array to trigger deployment
+                version: '1.0',
+                chainId: `0x${(84532).toString(16)}`, // Base Sepolia chain ID in hex
+                from: address
+              }]
+            });
+            console.log('Porto account deployed successfully:', deployResult);
+          } catch (error) {
+            console.error('Failed to deploy Porto account:', error);
+            throw new Error('Failed to deploy Porto account');
+          }
         }
-      });
-
+      }
+      // First request without payment header
+      const initialResponse = await fetch(`${SERVER_URL}/api/self/fortune`);
+      
       if (initialResponse.ok) {
-        const weatherData = await initialResponse.json();
+        const fortuneData = await initialResponse.json();
         setIsSuccess(true);
-        setSuccessData(weatherData);
+        setSuccessData(fortuneData);
         return;
       }
-
-      // Handle payment required scenario
+      
+      // Handle 402 Payment Required
       if (initialResponse.status === 402) {
-        await handlePaymentRequired(initialResponse);
+        const paymentRequirements = await initialResponse.json();
+        console.log('Payment required:', paymentRequirements);
+        
+        // Create EIP-3009 typed data from payment requirements
+        const domain = {
+          name: paymentRequirements.extra.name,
+          version: paymentRequirements.extra.version,
+          chainId: 84532, // Base Sepolia - hardcoded
+          verifyingContract: paymentRequirements.asset as `0x${string}`
+        };
+        
+        const transferResult = await signTransfer(
+          paymentRequirements.payTo as `0x${string}`,
+          paymentRequirements.maxAmountRequired,
+          domain,
+          paymentRequirements.maxTimeoutSeconds
+        );
+        
+        if (!transferResult) {
+          throw new Error('Failed to sign transfer authorization');
+        }
+        
+        console.log('Created EIP-3009 transfer authorization:', transferResult);
+        
+        // Create the X-PAYMENT header payload
+        const paymentPayload = {
+          x402Version: 1,
+          scheme: "exact",
+          network: "base-sepolia",
+          payload: {
+            signature: transferResult.signature,
+            authorization: {
+              from: transferResult.message.from,
+              to: transferResult.message.to,
+              value: transferResult.message.value,
+              validAfter: transferResult.message.validAfter,
+              validBefore: transferResult.message.validBefore,
+              nonce: transferResult.message.nonce
+            }
+          }
+        };
+        
+        // Encode as base64 JSON
+        const paymentHeader = btoa(JSON.stringify(paymentPayload));
+        console.log('Payment header payload:', paymentPayload);
+        console.log('Base64 encoded header:', paymentHeader);
+        
+        // Retry with the structured X-PAYMENT header
+        const paymentResponse = await fetch(`${SERVER_URL}/api/self/fortune`, {
+          headers: {
+            'X-PAYMENT': paymentHeader
+          }
+        });
+        
+        if (paymentResponse.ok) {
+          const fortuneData = await paymentResponse.json();
+          setIsSuccess(true);
+          setSuccessData(fortuneData);
+        } else {
+          throw new Error(`Payment processing failed: ${paymentResponse.status} ${paymentResponse.statusText}`);
+        }
       } else {
-        throw new Error(`Failed to fetch weather data: ${initialResponse.status} ${initialResponse.statusText}`);
+        throw new Error(`Failed to fetch fortune data: ${initialResponse.status} ${initialResponse.statusText}`);
       }
     } catch (error) {
       console.error('Purchase failed:', error);
-      // In a production app, you might want to show this error to the user
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const handlePaymentRequired = async (paymentResponse: Response) => {
-    if (!walletClient) {
-      throw new Error('Wallet client not available');
-    }
-
-    // Verify super admin key exists
-    const superAdminKey = await readContract(walletClient, {
-      address: address as `0x${string}`,
-      abi: PORTO_ABI,
-      functionName: 'keyAt',
-      args: [BigInt(0)],
-    });
-
-    if (!superAdminKey) {
-      throw new Error('Super admin key not found');
-    }
-
-    // Parse payment request data
-    const paymentRequestData: PaymentRequest = await paymentResponse.json();
-    const prepareCalls = Json.parse(paymentRequestData.prepareCalls);
-    const typedData = prepareCalls.typedData;
-    
-    // Verify typed data integrity
-    const typedDataHash = hashTypedData(typedData);
-    const recomputedTypedDataHash = hashTypedData(typedData);
-    
-    if (recomputedTypedDataHash !== typedDataHash) {
-      throw new Error('Typed data hash mismatch - payment data may have been tampered with');
-    }
-
-    // Sign the payment intent
-    const signature = await walletClient.signTypedData({
-      account: address as `0x${string}`,
-      ...typedData,
-    }) as `0x${string}`;
-
-    // Complete payment and retrieve weather data
-    const paymentResponse2 = await fetch(`${SERVER_URL}/api/self/weather`, {
-      headers: {
-        'X-PAYMENT': signature,
-        'X-USER-ADDRESS': address as `0x${string}`
-      }
-    });
-
-    if (paymentResponse2.ok) {
-      const weatherData = await paymentResponse2.json();
-      setIsSuccess(true);
-      setSuccessData(weatherData);
-    } else {
-      throw new Error(`Payment processing failed: ${paymentResponse2.status} ${paymentResponse2.statusText}`);
     }
   };
 
@@ -121,20 +144,20 @@ export const PurchaseButtonSelf = () => {
       <div className="button-group">
         <button
           onClick={handlePurchase}
-          disabled={isProcessing || !address}
+          disabled={isProcessing || isSigningPending || !address}
           className="primary-button"
         >
-          {isProcessing ? 'Processing...' : 'Pay'}
+          {isProcessing ? 'Processing...' : isSigningPending ? 'Signing...' : 'Pay'}
         </button>
 
         {isSuccess && successData && (
           <div className="success-message">
             ✅ ${successData.price} purchase complete
             <div style={{ marginTop: '12px', fontSize: '14px', lineHeight: '1.4' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Weather Forecast:</div>
-              <div>🌤️ <strong>Weather:</strong> {successData.weather}</div>
-              <div>🌡️ <strong>Temperature:</strong> {successData.temperature}°F</div>
-              <div>📅 <strong>Date:</strong> {successData.futureDate}</div>
+              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Your Fortune:</div>
+              <div>🔮 <strong>Fortune:</strong> {successData.fortune}</div>
+              <div>📂 <strong>Category:</strong> {successData.category}</div>
+              <div>🍀 <strong>Lucky Number:</strong> {successData.luckyNumber}</div>
             </div>
           </div>
         )}
@@ -144,55 +167,8 @@ export const PurchaseButtonSelf = () => {
             Please connect your Porto wallet first
           </p>
         )}
-
-        <div className="collapsible-info">
-          <button
-            onClick={() => setIsInfoExpanded(!isInfoExpanded)}
-            className="info-toggle-button"
-          >
-            {isInfoExpanded ? '▼' : '▶'} Explanation
-          </button>
-
-          <div className={`info-section ${isInfoExpanded ? 'expanded' : 'collapsed'}`}>
-            <p>
-              User/Agent can pay for paywalled content by signing an intent to pay the merchant X amount for the content.
-              The merchant sends the final payment transaction onchain before returning the paywalled content.
-            </p>
-            <PurchaseSequenceDiagram />
-          </div>
-        </div>
       </div>
     </div>
-  );
-};
-
-/**
- * Sequence diagram showing the purchase flow
- */
-const PurchaseSequenceDiagram = () => {
-  const diagramDefinition = `
-    sequenceDiagram
-      participant User
-      participant Server
-      
-      User->>Server: Request Paywalled Content (1 click)
-      Server->>Server: Checks for non-existent X-PAYMENT header.
-      Server->>Server: Compute intent and quote for user to sign.
-      Server->>User: Returns: Status Code: 402, Intent and Quote
-      User->>User: Sign Intent (2 clicks)
-      User->>Server: Retries retrieving paywalled content (X-PAYMENT set to signed intent signature.)
-      Server->>Server: Verify signature matches expected intent and quote.
-      Server->>Server: Execute payment.
-      Server->>User: Returns: Status Code: 200, Paywalled Content
-      User->>User: Displays Content
-  `;
-
-  return (
-    <SequenceDiagram
-      title="Self Authorize Payment"
-      diagramDefinition={diagramDefinition}
-      idPrefix="payment"
-    />
   );
 };
 

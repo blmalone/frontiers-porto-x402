@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     host: true, // This allows access from other devices on your network
     proxy: {
-      '^/(api|siwe|logout)': {
+      '^/(api)': {
         target: process.env.VITE_PRODUCTION === 'true' ? 'https://api.porto.blainemalone.com' : 'http://localhost:8787',
         changeOrigin: true,
         secure: false,

@@ -1,6 +1,6 @@
-# Porto Payment Integration Demo
+# Mint My Fortune - Porto Payment Demo
 
-A full-stack application demonstrating two payment patterns using the Porto protocol for accessing paywalled content.
+A full-stack fortune telling application demonstrating two payment patterns using the Porto protocol for accessing paywalled fortune content.
 
 ## Project Structure
 
@@ -17,12 +17,12 @@ A full-stack application demonstrating two payment patterns using the Porto prot
 ## Payment Patterns
 
 ### Self-Payment
-Users sign their own payment transactions directly. The server prepares the transaction, user signs it, and the server executes it.
+Users sign their own payment transactions directly to access fortune readings. The server prepares the transaction, user signs it, and the server executes it.
 
 <img src="server/images/self-payment.png" alt="Self-Payment Flow" width="300">
 
 ### Delegated Payment  
-Users grant permissions to the merchant server, which then executes payments on their behalf. Requires upfront permission granting.
+Users grant permissions to the merchant server, which then executes payments on their behalf for fortune readings. Requires upfront permission granting.
 
 <img src="server/images/delegated-payment.png" alt="Delegated Payment Flow" width="300">
 
@@ -30,7 +30,7 @@ Users grant permissions to the merchant server, which then executes payments on 
 
 - **Frontend**: React, wagmi, Porto wallet integration
 - **Backend**: Hono, Cloudflare Workers
-- **Authentication**: Sign-In With Ethereum (SIWE)
+- **Authentication**: Simple wallet connection
 - **Payment Protocol**: Porto + X402 standard
 
 ## Prerequisites
@@ -57,7 +57,7 @@ Users grant permissions to the merchant server, which then executes payments on 
    pnpm dev
    ```
 
-4. **Connect Porto wallet** and ensure you have Base Sepolia testnet tokens
+4. **Connect Porto wallet** and ensure you have Base Sepolia testnet tokens to purchase fortune readings
 
 ## Environment Setup
 

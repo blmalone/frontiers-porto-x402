@@ -1,38 +1,33 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { MerchantRpc } from 'porto/server';
-import { encodeFunctionData, isHex, parseEther } from 'viem/utils';
 import { baseSepolia } from 'wagmi/chains';
-import { ServerActions } from 'porto/viem';
-import { waitForCallsStatus, readContract } from 'viem/actions';
-import { createClient, erc20Abi, http, isAddress, hashMessage, hashTypedData } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { createClient, http } from 'viem';
+import type { Context } from 'hono';
 import { Key } from 'porto';
-import {
-  Network,
-  PaymentRequirements,
-  Price,
-  Resource,
-} from 'x402/types';
-import { processPriceToAtomicAmount } from 'x402/shared';
-import type { Context, Next } from 'hono';
-import { generateSiweNonce, parseSiweMessage } from 'viem/siwe';
-import { deleteCookie, setCookie, getCookie } from 'hono/cookie';
-import * as jwt from 'hono/jwt';
-import { JWTPayload } from 'hono/utils/jwt/types';
-import { PORTO_ABI } from './abi';
-import { Json } from 'ox';
+import { ServerActions } from 'porto/viem';
+import { waitForCallsStatus } from 'viem/actions';
+import { encodeFunctionData } from 'viem/utils';
 
-interface WeatherData {
-  weather: string;
-  temperature: number;
-  futureDate: string;
+interface FortuneData {
+  fortune: string;
+  category: string;
+  luckyNumber: number;
   price: number;
 }
 
-interface PrepareCallsData {
-  typedData: any;
-  [key: string]: any;
+interface PaymentRequirements {
+  scheme: string;
+  network: string;
+  maxAmountRequired: string;
+  resource: string;
+  description: string;
+  mimeType: string;
+  payTo: string;
+  maxTimeoutSeconds: number;
+  asset: string;
+  outputSchema?: any;
+  extra?: any;
 }
 
 interface CallsStatus {
@@ -40,7 +35,9 @@ interface CallsStatus {
   receipts?: Array<{ transactionHash: `0x${string}` }>;
 }
 
-// Instantiate a Viem Client with Porto-compatible Chain
+const USDC_BASE_SEPOLIA = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+// Viem Client for Porto compatibility
 export const client = createClient({
   chain: baseSepolia,
   transport: http('https://base-sepolia.rpc.ithaca.xyz'),
@@ -49,7 +46,7 @@ export const client = createClient({
 const app = new Hono<{ Bindings: Env }>();
 
 /**
- * CORS configuration for the application
+ * CORS configuration
  */
 app.use('/*', cors({
   origin: (origin) => {
@@ -72,322 +69,45 @@ app.use('/*', cors({
 }));
 
 /**
- * Middleware to require self-payment for protected resources
+ * Generates random fortune data
  */
-const requireSelfPayment = (amount: string) => {
-  return async (c: Context<{ Bindings: Env }>, next: Next) => {
-    const host = c.req.header('host') || c.req.header('Host');
-    const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-    const resource = `${protocol}://${host}${c.req.path}` as Resource;
-    const merchantSigningKeyAddress = privateKeyToAccount(c.env.MERCHANT_PRIVATE_KEY as `0x${string}`).address;
+const getFortune = async (c: Context<{ Bindings: Env }>, price: number): Promise<Response> => {
+  const fortunes = [
+    "A great adventure awaits you in the digital realm.",
+    "Your blockchain investments will flourish like a digital garden.",
+    "The stars align for your next smart contract deployment.",
+    "Fortune favors the bold - mint your destiny today.",
+    "Your wallet will overflow with unexpected tokens.",
+    "A mysterious NFT will bring you great joy.",
+    "The oracle speaks: hodl strong, prosperity comes.",
+    "Your next transaction will unlock hidden treasures.",
+    "The cryptographic winds blow in your favor.",
+    "A decentralized future awaits your participation.",
+    "Your private keys will unlock doors to abundance.",
+    "The blockchain remembers your good deeds - rewards follow.",
+    "A wise trader you shall become, young padawan.",
+    "Your digital footprint leads to golden opportunities.",
+    "The metaverse calls your name - answer with courage."
+  ];
+  
+  const categories = ['Love', 'Wealth', 'Health', 'Career', 'Adventure', 'Wisdom', 'Luck', 'Success'];
+  
+  const randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+  const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+  const randomLuckyNumber = Math.floor(Math.random() * 100) + 1;
 
-    const signature = c.req.header("X-PAYMENT") as `0x${string}`;
-    const userAddress = c.req.header("X-USER-ADDRESS") as `0x${string}`;
-    
-    if (!signature || !isHex(signature)) {
-      return await handleMissingPayment(c, amount, resource, merchantSigningKeyAddress, userAddress);
-    }
-
-    if (!userAddress) {
-      return c.json({ error: 'User address is required' }, 401);
-    }
-
-    return await processPayment(c, userAddress, signature, amount, next);
-  };
-};
-
-/**
- * Handles cases where payment is missing and returns payment requirements
- */
-const handleMissingPayment = async (
-  c: Context<{ Bindings: Env }>,
-  amount: string,
-  resource: Resource,
-  merchantSigningKeyAddress: `0x${string}`,
-  userAddress: `0x${string}`
-) => {
-  const price = createPriceObject(amount);
-  const paymentRequirements = createExactPaymentRequirements(
-    price,
-    "base-sepolia",
-    resource,
-    "Access to weather data (async)",
-    merchantSigningKeyAddress,
-  );
-
-  const superAdminKey = await readContract(client, {
-    address: userAddress as `0x${string}`,
-    abi: PORTO_ABI,
-    functionName: 'keyAt',
-    args: [BigInt(0)],
-  });
-
-  const { prepareCallsResponse, digest } = await selfPaymentPrepareCalls(
-    client, 
-    parseEther(amount), 
-    superAdminKey, 
-    userAddress, 
-    c.env.MERCHANT_ADDRESS
-  );
-
-  const stringifiedPrepareCalls = Json.stringify(prepareCallsResponse);
-  await c.env.PREPARE_CALLS_STORE.put(userAddress, stringifiedPrepareCalls, { expirationTtl: 600 });
-
-  return c.json({
-    x402Version: 1,
-    error: "X-PAYMENT header is required",
-    accepts: paymentRequirements,
-    prepareCalls: stringifiedPrepareCalls,
-    digest: digest,
-  }, 402);
-};
-
-/**
- * Processes the payment signature and executes the transaction
- */
-const processPayment = async (
-  c: Context<{ Bindings: Env }>,
-  userAddress: `0x${string}`,
-  signature: `0x${string}`,
-  amount: string,
-  next: Next
-) => {
-  const storedPrepareCalls = await c.env.PREPARE_CALLS_STORE.get(userAddress);
-  const parsedPrepareCalls: PrepareCallsData = Json.parse(storedPrepareCalls || null);
-
-  if (!parsedPrepareCalls) {
-    return c.json({ error: 'Server unaware of payment. Please try again.' }, 401);
-  }
-
-  const typedData = parsedPrepareCalls.typedData;
-  const typedDataHash = hashTypedData(typedData);
-
-  const { valid } = await ServerActions.verifySignature(client, {
-    address: userAddress,
-    digest: typedDataHash,
-    signature,
-  });
-
-  if (!valid) {
-    return c.json({ error: 'Invalid signature' }, 401);
-  }
-
-  const response = await ServerActions.sendPreparedCalls(client, {
-    ...parsedPrepareCalls,
-    signature,
-    chain: baseSepolia,
-  } as any); // TODO: fix this type error
-
-  const status = await waitForCallsStatus(client, {
-    id: response.id,
-    status: (status: CallsStatus) => status.statusCode === 200,
-    timeout: 20_000,
-  });
-
-  if (status.statusCode !== 200) {
-    throw new Error('Payment failed');
-  }
-
-  await c.env.PREPARE_CALLS_STORE.delete(userAddress);
-  await next();
-};
-
-/**
- * Middleware to require delegated payment for protected resources
- */
-const requireDelegatedPayment = (serverSpendLimit: string, contentPrice: string) => {
-  return async (c: Context<{ Bindings: Env }>, next: Next) => {
-    const host = c.req.header('host') || c.req.header('Host');
-    const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
-    const resource = `${protocol}://${host}${c.req.path}` as Resource;
-
-    let userAddress: `0x${string}`;
-    try {
-      const user = await verifyAuth(c);
-      userAddress = user.sub as `0x${string}`;
-    } catch (error) {
-      return c.json({ error: 'Authentication required' }, 401);
-    }
-
-    const merchantKeyPair = Key.fromSecp256k1({
-      privateKey: c.env.MERCHANT_PRIVATE_KEY as `0x${string}`,
-    });
-
-    try {
-      const sendCallsResponse = await ServerActions.sendCalls(client, {
-        account: userAddress,
-        calls: [{
-          to: "0x29f45fc3ed1d0ffafb5e2af9cc6c3ab1555cd5a2" as `0x${string}`,
-          data: encodeFunctionData({
-            abi: erc20Abi,
-            functionName: 'transfer',
-            args: [c.env.MERCHANT_ADDRESS, parseEther(contentPrice)]
-          }),
-          value: 0n // No ETH value for ERC20 transfers 
-        }],
-        key: merchantKeyPair,
-        feeToken: "0x29f45fc3ed1d0ffafb5e2af9cc6c3ab1555cd5a2"
-      });
-
-      const status = await waitForCallsStatus(client, {
-        id: sendCallsResponse.id,
-        status: (status: CallsStatus) => status.statusCode === 200,
-        timeout: 20_000,
-      });
-
-      if (status.statusCode !== 200) {
-        return c.json({ error: 'Payment failed' }, 500);
-      }
-
-      await next();
-    } catch (error: any) {
-      return await handleDelegatedPaymentError(c, serverSpendLimit, resource);
-    }
-  };
-};
-
-/**
- * Handles delegated payment errors by returning payment requirements
- */
-const handleDelegatedPaymentError = async (
-  c: Context<{ Bindings: Env }>,
-  serverSpendLimit: string,
-  resource: Resource
-) => {
-  const merchantSigningKeyAddress = privateKeyToAccount(c.env.MERCHANT_PRIVATE_KEY as `0x${string}`).address;
-  const totalServerSpendDetails = createPriceObject(serverSpendLimit);
-
-  const paymentRequirements = createExactPaymentRequirements(
-    totalServerSpendDetails,
-    "base-sepolia",
-    resource,
-    "Access to weather data (async)",
-    merchantSigningKeyAddress,
-  );
-
-  return c.json({
-    x402Version: 1,
-    error: "X-PAYMENT header is required",
-    accepts: paymentRequirements,
-  }, 402);
-};
-
-/**
- * Creates a price object with the standard token configuration
- */
-const createPriceObject = (amount: string): Price => {
-  return {
-    amount: parseEther(amount).toString(),
-    asset: {
-      address: "0x29f45fc3ed1d0ffafb5e2af9cc6c3ab1555cd5a2" as `0x${string}`,
-      decimals: 18,  // Correct decimals for Exp token
-      eip712: {
-        name: "Exp",  // Correct name for Exp token
-        version: "1", // Default version
-      },
-    },
-  };
-};
-
-/**
- * Creates exact payment requirements for the specified price and resource
- */
-function createExactPaymentRequirements(
-  price: Price,
-  network: Network,
-  resource: Resource,
-  description = "",
-  recipient: `0x${string}`
-): PaymentRequirements {
-  const atomicAmountForAsset = processPriceToAtomicAmount(price, network);
-  if ("error" in atomicAmountForAsset) {
-    throw new Error(atomicAmountForAsset.error);
-  }
-  const { maxAmountRequired, asset } = atomicAmountForAsset;
-
-  return {
-    scheme: "exact",
-    network,
-    maxAmountRequired,
-    resource,
-    description,
-    mimeType: "",
-    payTo: recipient,
-    maxTimeoutSeconds: 60,
-    asset: asset.address,
-    outputSchema: undefined,
-    extra: {
-      name: asset.eip712.name,
-      version: asset.eip712.version,
-    },
-  };
-}
-
-/**
- * Prepares calls for self-payment scenarios
- */
-const selfPaymentPrepareCalls = async (
-  client: any,
-  amount: bigint,
-  superAdminKey: any,
-  fromAddress: `0x${string}`,
-  toAddress: `0x${string}`
-) => {
-  const prepareCallsResponse = await ServerActions.prepareCalls(client, {
-    account: fromAddress as `0x${string}`,
-    calls: [{
-      to: toAddress as `0x${string}`,
-      value: amount,
-      data: '0x' as `0x${string}`,
-    }],
-    key: {
-      publicKey: superAdminKey.publicKey,
-      type: "webauthn-p256",
-    },
-    feeToken: '0x29f45fc3ed1d0ffafb5e2af9cc6c3ab1555cd5a2',
-    chain: baseSepolia,
-  }) as any;
-
-  const hashedTypedData = hashTypedData(prepareCallsResponse.typedData);
-  return { prepareCallsResponse, digest: hashedTypedData };
-};
-
-/**
- * Verifies JWT authentication from cookie
- */
-const verifyAuth = async (c: Context<{ Bindings: Env }>): Promise<JWTPayload> => {
-  const authCookie = getCookie(c, 'auth');
-  if (!authCookie) {
-    throw new Error('No auth cookie found');
-  }
-  return await jwt.verify(authCookie, c.env.JWT_SECRET);
-};
-
-/**
- * Generates mock weather data for the specified price
- */
-const getWeather = async (c: Context<{ Bindings: Env }>, price: number): Promise<Response> => {
-  const weatherConditions = ['sunny', 'cloudy', 'rainy', 'snowy', 'foggy', 'windy', 'stormy', 'partly cloudy'];
-  const randomWeather = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-  const randomTemperature = Math.floor(Math.random() * 80) + 20; // Random temp between 20-99°F
-
-  const weatherData: WeatherData = {
-    weather: randomWeather,
-    temperature: randomTemperature,
-    futureDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }),
+  const fortuneData: FortuneData = {
+    fortune: randomFortune,
+    category: randomCategory,
+    luckyNumber: randomLuckyNumber,
     price: price,
   };
 
-  return c.json(weatherData);
+  return c.json(fortuneData);
 };
 
 /**
- * RPC endpoint for merchant operations
+ * RPC endpoint for Porto merchant operations
  */
 app.all('/rpc', (c) => {
   return MerchantRpc.requestHandler({
@@ -404,92 +124,118 @@ app.all('/rpc', (c) => {
 });
 
 /**
- * Generate SIWE nonce for authentication
+ * Fortune endpoint with payment requirement check
  */
-app.get('/siwe/nonce', async (c) => {
-  const nonce = generateSiweNonce();
+app.get('/api/self/fortune', async (c) => {
+  // Check for X-PAYMENT header
+  const paymentHeader = c.req.header('X-PAYMENT');
   
-  // Store nonce for this session (10 minutes)
-  await c.env.NONCE_STORE.put(nonce, 'valid', { expirationTtl: 600 });
-
-  return c.json({ nonce });
-});
-
-/**
- * Verify SIWE signature and create authenticated session
- */
-app.post('/siwe', async (c) => {
-  const { message, signature } = await c.req.json();
-  const { address, chainId, nonce } = parseSiweMessage(message);
-
-  if (!nonce) return c.json({ error: 'Nonce is required' }, 400);
-
-  const storedNonce = await c.env.NONCE_STORE.get(nonce);
-  if (!storedNonce) return c.json({ error: 'Invalid or expired nonce' }, 401);
-  await c.env.NONCE_STORE.delete(nonce);
-
-  const validResponse = await ServerActions.verifySignature(client, {
-    address: address!,
-    digest: hashMessage(message),
-    signature,
-  });
-
-  if (!validResponse || !validResponse.valid) {
-    return c.json({ error: 'Invalid signature' }, 401);
+  if (!paymentHeader || paymentHeader.trim() === '') {
+    // Return 402 with payment requirements
+    const host = c.req.header('host') || c.req.header('Host') || 'localhost:8787';
+    const protocol = c.req.url.startsWith('https') ? 'https' : 'http';
+    const resource = `${protocol}://${host}${c.req.path}`;
+    
+    const paymentRequirements: PaymentRequirements = {
+      scheme: "exact",
+      network: "base-sepolia", 
+      maxAmountRequired: "750", 
+      resource: resource,
+      description: "Access to fortune",
+      mimeType: "application/json",
+      payTo: "0x50F1d3b9F5811F333e7Ef77D14B470cEAA08e905", // Blaine's hot wallet
+      maxTimeoutSeconds: 60,
+      asset: USDC_BASE_SEPOLIA, // Base Sepolia USDC
+      extra: {
+        name: "USDC",
+        version: "2"
+      }
+    };
+    
+    return c.json(paymentRequirements, 402);
   }
-
-  const maxAge = 60 * 60 * 24 * 7; // 7 days
-  const exp = Math.floor(Date.now() / 1000) + maxAge;
-  const token = await jwt.sign({ exp, sub: address }, c.env.JWT_SECRET);
-
-  setCookie(c, 'auth', token, {
-    secure: true,
-    sameSite: 'none',
-    path: '/',
-    maxAge,
-  });
-
-  return c.json({ success: true });
-});
-
-/**
- * Logout endpoint - clears authentication cookie
- */
-app.post('/logout', async (c) => {
-  deleteCookie(c, 'auth');
-  return c.json({ success: true });
-});
-
-/**
- * Get authenticated user information
- */
-app.get('/api/me', async (c) => {
+  
+  // Payment header exists, decode and execute the transfer
+  console.log('Payment header received (base64):', paymentHeader);
+  
+  let paymentData;
   try {
-    const user = await verifyAuth(c);
-    return c.json({ user: user });
+    // Decode base64 JSON
+    const decodedPayment = atob(paymentHeader);
+    paymentData = JSON.parse(decodedPayment);
+    console.log('Decoded payment data:', paymentData);
   } catch (error) {
-    return c.json({ error: 'Authentication failed' }, 401);
+    return c.json({ error: 'Invalid payment header format' }, 400);
+  }
+  
+  // Validate payment data structure
+  if (!paymentData.payload || !paymentData.payload.signature || !paymentData.payload.authorization) {
+    return c.json({ error: 'Invalid payment data structure' }, 400);
+  }
+  
+  const { signature, authorization } = paymentData.payload;
+  console.log('Authorization details:', authorization);
+  
+  const merchantKeyPair = Key.fromSecp256k1({
+    privateKey: c.env.MERCHANT_PRIVATE_KEY as `0x${string}`,
+  });
+
+  try {
+    // Encode the transferWithAuthorization function call
+    const transferData = encodeFunctionData({
+      abi: [{
+        name: 'transferWithAuthorization',
+        type: 'function',
+        inputs: [
+          { name: 'from', type: 'address' },
+          { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'validAfter', type: 'uint256' },
+          { name: 'validBefore', type: 'uint256' },
+          { name: 'nonce', type: 'bytes32' },
+          { name: 'signature', type: 'bytes' }
+        ]
+      }],
+      functionName: 'transferWithAuthorization',
+      args: [
+        authorization.from,           // address
+        authorization.to,             // address  
+        BigInt(authorization.value),  // uint256 -> BigInt
+        BigInt(authorization.validAfter),  // uint256 -> BigInt
+        BigInt(authorization.validBefore), // uint256 -> BigInt
+        authorization.nonce,          // bytes32
+        signature                     // bytes
+      ]
+    });
+    
+    // Execute the EIP-3009 transfer using the signature
+    const sendCallsResponse = await ServerActions.sendCalls(client, {
+      account: c.env.MERCHANT_ADDRESS as `0x${string}`,
+      calls: [{
+        to: USDC_BASE_SEPOLIA as `0x${string}`, // USDC contract
+        data: transferData,
+        value: 0n
+      }],
+      key: merchantKeyPair,
+      feeToken: USDC_BASE_SEPOLIA
+    });
+
+    const status = await waitForCallsStatus(client, {
+      id: sendCallsResponse.id,
+      status: (status: CallsStatus) => status.statusCode === 200,
+      timeout: 20_000,
+    });
+
+    if (status.statusCode !== 200) {
+      return c.json({ error: 'Payment failed' }, 500);
+    }
+
+    // Payment successful, return fortune data
+    return getFortune(c, 0.001);
+  } catch (error: any) {
+    console.error('Payment execution failed:', error);
+    return c.json({ error: 'Payment execution failed' }, 500);
   }
 });
-
-/**
- * Protected weather endpoint using delegated payment
- */
-app.get('/api/delegated/weather',
-  requireDelegatedPayment('2', '0.001'),
-  async (c) => {
-    return getWeather(c, 0.001);
-  }
-);
-
-/**
- * Protected weather endpoint using self-payment
- */
-app.get('/api/self/weather',
-  requireSelfPayment('0.001'),
-  async (c) => {
-    return getWeather(c, 0.001);
-  }
-);
 
 export default app;

@@ -3,11 +3,9 @@ import { CopyButton } from './CopyButton'
 export function AccountDisplay({
     userAddress,
     serverAddress,
-    sessionExpiry,
 }: {
     userAddress: string
     serverAddress: string
-    sessionExpiry: string
 }) {
     function truncateAddress(address: string): string {
         if (!address || address.length < 10) return address
@@ -44,12 +42,7 @@ export function AccountDisplay({
                     </div>
                 </div>
 
-                <div className="info-row">
-                    <span className="label">Session Expiry:</span>
-                    <div className="value-container">
-                        <span className="value-text">{sessionExpiry}</span>
-                    </div>
-                </div>
+
             </div>
         </div>
     )

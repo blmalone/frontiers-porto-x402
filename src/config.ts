@@ -6,8 +6,7 @@ import { SERVER_URL } from './constants'
 
 export const wagmiConfig = createConfig({
   chains: [baseSepolia],
-  multiInjectedProviderDiscovery: false,
-  connectors: [porto({ merchantRpcUrl: `${SERVER_URL}/rpc`, mode: Mode.dialog(), authUrl: SERVER_URL })],
+  connectors: [porto({ merchantRpcUrl: `${SERVER_URL}/rpc`, mode: Mode.dialog() })],
   transports: {
     [baseSepolia.id]: http("https://base-sepolia.rpc.ithaca.xyz"),
   },
