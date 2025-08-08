@@ -30,7 +30,7 @@ function App() {
       <div className="brand-container">
         <div className="brand">
           <span className="emoji-logo">🔮</span>
-          <h1 className="brand-title">Mint My Fortune</h1>
+          <h1 className="brand-title">Fortune Teller</h1>
         </div>
       </div>
 
@@ -75,12 +75,6 @@ function App() {
           </div>
         ) : (
           <div>
-            <div className="profile">
-              <AccountDisplay
-                userAddress={address!}
-                serverAddress={"0xd594a20a23eac0fdae6b3d1ece066a0d3595bf23"}
-              />
-            </div>
             <PurchaseButtonSelf />
           </div>
         )}
@@ -96,25 +90,7 @@ function App() {
         alignItems: 'center'
       }}>
         <a
-          href="https://x.com/blainemalone"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: '#666',
-            textDecoration: 'none',
-            transition: 'color 0.2s',
-            display: 'flex',
-            alignItems: 'center'
-          }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#1da1f2'}
-          onMouseOut={(e) => e.currentTarget.style.color = '#666'}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-          </svg>
-        </a>
-        <a
-          href="https://github.com/blmalone/porto-paywall"
+          href="https://github.com/blmalone/frontiers-porto-x402/tree/main"
           target="_blank"
           rel="noopener noreferrer"
           style={{

@@ -748,7 +748,7 @@ hr {
 /* Component container styles */
 .component-container {
   padding: 0;
-  max-width: 800px;
+  max-width: 500px;
   margin: 1.5rem auto 0 auto;
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   display: flex;
@@ -1303,6 +1303,179 @@ hr {
     line-height: 1.2;
     max-width: 95%;
     padding: 0 0.5rem;
+  }
+}
+
+/* ==========================================
+   LOCKED FORTUNE BOX STYLES
+   ========================================== */
+
+.locked-fortune-box {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 0 2rem 0;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px solid #dee2e6;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.locked-fortune-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border-color: #adb5bd;
+}
+
+.locked-fortune-content {
+  position: relative;
+  cursor: help;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  animation: pulse 2s infinite;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.blurred-fortune {
+  width: 100%;
+  text-align: center;
+  filter: blur(3px);
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.locked-fortune-content:hover .blurred-fortune {
+  filter: blur(2px);
+  opacity: 0.8;
+}
+
+.fortune-placeholder {
+  padding: 1rem;
+}
+
+.mystery-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #6c757d;
+  margin-bottom: 1rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.blurred-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.blurred-line {
+  font-size: 0.9rem;
+  color: #868e96;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.lock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.locked-fortune-content:hover .lock-overlay {
+  opacity: 1;
+}
+
+.lock-message {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.lock-emoji {
+  font-size: 1rem;
+}
+
+.lock-text {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* Mobile responsive locked fortune box */
+@media (max-width: 768px) {
+  .locked-fortune-box {
+    margin: 0 auto 1.5rem auto;
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+  
+  .lock-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .mystery-text {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .blurred-line {
+    font-size: 0.8rem;
+    padding: 0.4rem;
+  }
+  
+  .lock-message {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .locked-fortune-box {
+    padding: 1rem;
+    margin: 0 auto 1rem auto;
+  }
+  
+  .lock-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .mystery-text {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .blurred-line {
+    font-size: 0.75rem;
+    padding: 0.3rem;
   }
 }
 
