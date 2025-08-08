@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bello-server",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-03",
+  "kv_namespaces": [
+    {
+      "binding": "NONCE_STORE",
+      "id": "3035fb789e7a4b6a8fbb77dfda433344",
+      "preview_id": "79918d61977d4054a1cc7d656b231907"
+    },
+    {
+      "binding": "PREPARE_CALLS_STORE",
+      "id": "a770484b676340db921e852554b16b73",
+      "preview_id": "3076e0af65d54d869e1f25505956a3cf"
+    }
+  ]
+}
