@@ -141,49 +141,63 @@ export const PurchaseButtonSelf = () => {
 
   return (
     <div className="component-container">
-      {/* Locked Fortune Box */}
-      <div className="locked-fortune-box">
-        <div className="locked-fortune-content" title="🔒 This content is locked by x402 payment protocol. x402 is a web standard that enables seamless crypto payments directly in HTTP requests, allowing you to pay for content without leaving the page or using traditional payment processors.">
-          <div className="lock-icon">🔒</div>
-          <div className="mystery-text">✨ Your fortune awaits... ✨</div>
-          <div className="blurred-fortune">
-            <div className="fortune-placeholder">
-              <div className="blurred-lines">
-                <div className="blurred-line">🔮 A mysterious message from the stars</div>
-                <div className="blurred-line">📂 Hidden in the cosmic archives</div>
-                <div className="blurred-line">🍀 Waiting for your lucky moment</div>
-              </div>
-            </div>
-          </div>
-          <div className="lock-overlay">
-            <div className="lock-message">
-              <span className="lock-emoji">🔐</span>
-              <span className="lock-text">Content Locked by x402</span>
-            </div>
+              {/* Fortune Box - Locked or Unlocked */}
+        <div className={`fortune-box ${isSuccess ? 'unlocked' : 'locked'}`}>
+          <div className="fortune-content">
+            {!isSuccess ? (
+              <>
+                <div className="lock-icon">🔒</div>
+                <div className="mystery-text">✨ Your fortune awaits... ✨</div>
+                <div className="blurred-fortune">
+                  <div className="fortune-placeholder">
+                    <div className="blurred-lines">
+                      <div className="blurred-line">🔮 A mysterious message from the stars</div>
+                      <div className="blurred-line">📂 Hidden in the cosmic archives</div>
+                      <div className="blurred-line">🍀 Waiting for your lucky moment</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="lock-overlay">
+                  <div className="lock-message">
+                    <span className="lock-emoji">🔐</span>
+                    <span className="lock-text">Content Locked by x402</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="unlock-icon">✨</div>
+                <div className="revealed-fortune">
+                  <div className="fortune-content-revealed">
+                    <div className="fortune-lines">
+                      <div className="fortune-line"><strong>{successData?.fortune}</strong></div>
+                      <div className="fortune-line">🍀 <strong>Lucky Number:</strong> {successData?.luckyNumber}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="unlock-overlay">
+                  <div className="unlock-message">
+                    <span className="unlock-emoji">✅</span>
+                    <span className="unlock-text">Unlocked with ${successData?.price}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
-      </div>
 
       <div className="button-group">
-        <button
-          onClick={handlePurchase}
-          disabled={isProcessing || isSigningPending || !address}
-          className="primary-button"
-        >
-          {isProcessing ? 'Processing...' : isSigningPending ? 'Signing...' : '🔓 Unlock'}
-        </button>
-
-        {isSuccess && successData && (
-          <div className="success-message">
-            ✅ ${successData.price} purchase complete
-            <div style={{ marginTop: '12px', fontSize: '14px', lineHeight: '1.4' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Your Fortune:</div>
-              <div>🔮 <strong>Fortune:</strong> {successData.fortune}</div>
-              <div>📂 <strong>Category:</strong> {successData.category}</div>
-              <div>🍀 <strong>Lucky Number:</strong> {successData.luckyNumber}</div>
-            </div>
-          </div>
+        {!isSuccess && (
+          <button
+            onClick={handlePurchase}
+            disabled={isProcessing || isSigningPending || !address}
+            className="primary-button"
+          >
+            {isProcessing ? 'Processing...' : isSigningPending ? 'Signing...' : '🔓 Unlock'}
+          </button>
         )}
+
+
 
         {!address && (
           <p className="helper-text">
